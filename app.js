@@ -5,6 +5,12 @@
 
 const express = require("express");
 const app = express();
+const mongoose = require("mongoose");
+
+// Connect to MongoDB Compass replacing 'testdb' with your desired DB name
+mongoose.connect("mongodb://127.0.0.1:27017/testdb")
+    .then(() => console.log("Connected to MongoDB Compass successfully!"))
+    .catch((error) => console.error("Error connecting to MongoDB Compass:", error));
 const productRoutes = require("./Routes/ProductRoutes");
 const userRoutes = require("./Routes/UserRoutes");
 const cartRoutes = require("./Routes/CartRoutes");
