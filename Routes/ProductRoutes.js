@@ -1,56 +1,80 @@
 const router = require("express").Router();
+const Product = require("../models/product"); // Import the Product model
 
-
-
-var products = [{
-    id: 1,
-    name: "",
-    price: "",
-    description: "",
-}]
-
-
-router.get("/", (req, res) => {
-    res.send(products);
-})
-
-
-router.post("/add", (req, res) => {
-    var newProduct = {
-        id: req.body.id,
-        name: req.body.name,
-        price: req.body.price,
-        description: req.body.description,
+// ==============================
+// CREATE - POST /products/add
+// ==============================
+router.post("/add", async (req, res) => {
+    try {
+        const product = new Product({
+            name: req.body.name,
+            price: req.body.price,
+            description: req.body.description,
+        });
+        const savedProduct = await product.save();
+        res.status(201).json({ message: "Product added successfully", product: savedProduct });
+    } catch (err) {
+        res.status(500).json({ message: "Error adding product", error: err.message });
     }
-    products.push(newProduct);
-    res.send(newProduct);
-})
+});
 
-router.post("/update/:id", (req, res) => {
-    var id = req.params.id;
-    for (var i = 0; i < products.length; i++) {
-        if (products[i].id == id) {
-            products[i].name = req.body.name;
-            products[i].price = req.body.price;
-            products[i].description = req.body.description;
-            res.send("Product updated");
-            return;
-        }
+// ==============================
+// READ ALL - GET /products
+// ==============================
+router.get("/", async (req, res) => {
+    try {
+        const products = await Product.find({});
+        res.status(200).json(products);
+    } catch (err) {
+        res.status(500).json({ message: "Error fetching products", error: err.message });
     }
-    res.send("Product not found");
-})
+});
 
-
-router.delete("/remove/:id", (req, res) => {
-    var id = parseInt(req.params.id);
-    var productIndex = products.findIndex(p => p.id == id);
-
-    if (productIndex !== -1) {
-        var removedProduct = products.splice(productIndex, 1);
-        res.json({ message: "Product removed successfully", product: removedProduct[0] });
-    } else {
-        res.status(404).json({ message: "Product not found" });
+// ==============================
+// READ ONE - GET /products/:id
+// ==============================
+router.get("/:id", async (req, res) => {
+    try {
+        const product = await Product.findById(req.params.id);
+        if (!product) return res.status(404).json({ message: "Product not found" });
+        res.status(200).json(product);
+    } catch (err) {
+        res.status(500).json({ message: "Error fetching product", error: err.message });
     }
-})
+});
+
+// ==============================
+// UPDATE - PUT /products/update/:id
+// ==============================
+router.put("/update/:id", async (req, res) => {
+    try {
+        const updatedProduct = await Product.findByIdAndUpdate(
+            req.params.id,
+            {
+                name: req.body.name,
+                price: req.body.price,
+                description: req.body.description,
+            },
+            { new: true } // returns the updated document
+        );
+        if (!updatedProduct) return res.status(404).json({ message: "Product not found" });
+        res.status(200).json({ message: "Product updated successfully", product: updatedProduct });
+    } catch (err) {
+        res.status(500).json({ message: "Error updating product", error: err.message });
+    }
+});
+
+// ==============================
+// DELETE - DELETE /products/remove/:id
+// ==============================
+router.delete("/remove/:id", async (req, res) => {
+    try {
+        const deletedProduct = await Product.findByIdAndDelete(req.params.id);
+        if (!deletedProduct) return res.status(404).json({ message: "Product not found" });
+        res.status(200).json({ message: "Product removed successfully", product: deletedProduct });
+    } catch (err) {
+        res.status(500).json({ message: "Error deleting product", error: err.message });
+    }
+});
 
 module.exports = router;

@@ -1,95 +1,102 @@
 const router = require("express").Router();
 const { body, validationResult } = require("express-validator");
+const User = require("../models/user"); // Import the User model
 
-
-var users = [{
-    id: 1,
-    name: "John",
-    email: "",
-    password: "",
-    address: "",
-    contact: ""
-}]
-
-
-router.get("/", (req, res) => {
-    res.send(users);
-});
-
-router.get("/:id", (req, res) => {
-    var id = req.params.id;
-    var user = users.find(u => u.id == id);
-    if (user) {
-        res.send(user);
-    } else {
-        res.status(404).send("User not found");
-    }
-});
-
+// ==============================
+// CREATE - POST /users/add
+// ==============================
 router.post("/add", [
     body('name').notEmpty().withMessage('Name is required').trim().isLength({ min: 2, max: 50 }).withMessage('Name must be between 2 and 50 characters'),
     body('email').notEmpty().withMessage('Email is required').isEmail().withMessage('Invalid email format').normalizeEmail(),
     body('password').notEmpty().withMessage('Password is required').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
     body('address').optional().trim().isLength({ max: 200 }).withMessage('Address must not exceed 200 characters'),
     body('contact').notEmpty().withMessage('Contact is required').matches(/^[0-9]{10}$/).withMessage('Contact must be a 10-digit number')
-], (req, res) => {
+], async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
     }
-
-    var newUser = {
-        id: users.length > 0 ? Math.max(...users.map(u => u.id)) + 1 : 1,
-        name: req.body.name,
-        email: req.body.email,
-        password: req.body.password,
-        address: req.body.address || "",
-        contact: req.body.contact
-    };
-    users.push(newUser);
-    res.status(201).json({ message: "User added successfully", user: newUser });
+    try {
+        const user = new User({
+            name: req.body.name,
+            email: req.body.email,
+            password: req.body.password,
+            address: req.body.address || "",
+            contact: req.body.contact,
+        });
+        const savedUser = await user.save();
+        res.status(201).json({ message: "User added successfully", user: savedUser });
+    } catch (err) {
+        // Handle duplicate email
+        if (err.code === 11000) {
+            return res.status(409).json({ message: "Email already exists" });
+        }
+        res.status(500).json({ message: "Error adding user", error: err.message });
+    }
 });
 
+// ==============================
+// READ ALL - GET /users
+// ==============================
+router.get("/", async (req, res) => {
+    try {
+        const users = await User.find({});
+        res.status(200).json(users);
+    } catch (err) {
+        res.status(500).json({ message: "Error fetching users", error: err.message });
+    }
+});
 
+// ==============================
+// READ ONE - GET /users/:id
+// ==============================
+router.get("/:id", async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user) return res.status(404).json({ message: "User not found" });
+        res.status(200).json(user);
+    } catch (err) {
+        res.status(500).json({ message: "Error fetching user", error: err.message });
+    }
+});
 
+// ==============================
+// UPDATE - PUT /users/update/:id
+// ==============================
 router.put("/update/:id", [
     body('name').optional().trim().isLength({ min: 2, max: 50 }).withMessage('Name must be between 2 and 50 characters'),
     body('email').optional().isEmail().withMessage('Invalid email format').normalizeEmail(),
     body('password').optional().isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
     body('address').optional().trim().isLength({ max: 200 }).withMessage('Address must not exceed 200 characters'),
     body('contact').optional().matches(/^[0-9]{10}$/).withMessage('Contact must be a 10-digit number')
-], (req, res) => {
+], async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
     }
-
-    var id = req.params.id;
-    var userIndex = users.findIndex(u => u.id == id);
-
-    if (userIndex !== -1) {
-        if (req.body.name) users[userIndex].name = req.body.name;
-        if (req.body.email) users[userIndex].email = req.body.email;
-        if (req.body.password) users[userIndex].password = req.body.password;
-        if (req.body.address !== undefined) users[userIndex].address = req.body.address;
-        if (req.body.contact) users[userIndex].contact = req.body.contact;
-
-        res.json({ message: "User updated successfully", user: users[userIndex] });
-    } else {
-        res.status(404).send("User not found");
+    try {
+        const updatedUser = await User.findByIdAndUpdate(
+            req.params.id,
+            req.body,
+            { new: true } // returns the updated document
+        );
+        if (!updatedUser) return res.status(404).json({ message: "User not found" });
+        res.status(200).json({ message: "User updated successfully", user: updatedUser });
+    } catch (err) {
+        res.status(500).json({ message: "Error updating user", error: err.message });
     }
 });
 
-
-router.delete("/remove/:id", (req, res) => {
-    var id = req.params.id;
-    var userIndex = users.findIndex(u => u.id == id);
-
-    if (userIndex !== -1) {
-        var removedUser = users.splice(userIndex, 1);
-        res.json({ message: "User removed successfully", user: removedUser[0] });
-    } else {
-        res.status(404).send("User not found");
+// ==============================
+// DELETE - DELETE /users/remove/:id
+// ==============================
+router.delete("/remove/:id", async (req, res) => {
+    try {
+        const deletedUser = await User.findByIdAndDelete(req.params.id);
+        if (!deletedUser) return res.status(404).json({ message: "User not found" });
+        res.status(200).json({ message: "User removed successfully", user: deletedUser });
+    } catch (err) {
+        res.status(500).json({ message: "Error deleting user", error: err.message });
     }
 });
 
